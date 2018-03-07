@@ -147,7 +147,7 @@ def read_ply(filename):
     return data
 
 
-def write_ply(filename, points=None, mesh=None, as_text=False):
+def write_ply(filename, points_array=None, mesh=None, as_text=False):
     """
 
     Parameters
@@ -177,8 +177,15 @@ def write_ply(filename, points=None, mesh=None, as_text=False):
         else:
             header.append('format binary_' + sys.byteorder + '_endian 1.0')
 
-        if points is not None:
-            header.extend(describe_element('vertex', points))
+        if points_array is not None:
+            if points_array.shape[1]==3:  # without color information
+                points_df = pd.DataFrame(data=points_array, columns=['x', 'y', 'z'])
+            elif points_array.shape[1] == 6:  # with color information
+                points_df = pd.DataFrame(data=points_array, columns=['x','y','z','red','green','blue'])
+                points_df['red'] = points_df['red'].astype(np.uint8)
+                points_df['green'] = points_df['green'].astype(np.uint8)
+                points_df['blue'] = points_df['blue'].astype(np.uint8)
+            header.extend(describe_element('vertex', points_df))
         if mesh is not None:
             mesh = mesh.copy()
             mesh.insert(loc=0, column="n_points", value=3)
@@ -191,8 +198,8 @@ def write_ply(filename, points=None, mesh=None, as_text=False):
             ply.write("%s\n" % line)
 
     if as_text:
-        if points is not None:
-            points.to_csv(filename, sep=" ", index=False, header=False, mode='a',
+        if points_df is not None:
+            points_df.to_csv(filename, sep=" ", index=False, header=False, mode='a',
                           encoding='ascii')
         if mesh is not None:
             mesh.to_csv(filename, sep=" ", index=False, header=False, mode='a',
@@ -201,8 +208,8 @@ def write_ply(filename, points=None, mesh=None, as_text=False):
     else:
         # open in binary/append to use tofile
         with open(filename, 'ab') as ply:
-            if points is not None:
-                points.to_records(index=False).tofile(ply)
+            if points_df is not None:
+                points_df.to_records(index=False).tofile(ply)
             if mesh is not None:
                 mesh.to_records(index=False).tofile(ply)
 
@@ -231,6 +238,6 @@ def describe_element(name, df):
         for i in range(len(df.columns)):
             # get first letter of dtype to infer format
             f = property_formats[str(df.dtypes[i])[0]]
-            element.append('property ' + f + ' ' + df.columns.values[i])
+            element.append('property ' + f + ' ' + str(df.columns.values[i]))
 
     return element
